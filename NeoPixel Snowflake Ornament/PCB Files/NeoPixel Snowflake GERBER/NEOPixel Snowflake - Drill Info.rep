@@ -1,0 +1,24 @@
+ULTIBOARD DRILL REPORT
+
+Design: NEOPixel Snowflake
+
+DRILL FILE SETTINGS
+Excellon 2, Absolute, Inch, 2.4 
+
+
+DEFINITION COPPER LAYERS
+Copper Top
+Copper Inner 1
+Copper Inner 2
+Copper Bottom
+
+
+--------------------------------------------------------------------
+
+DRILLFILE                                           LAMINATION
+NEOPixel Snowflake - Copper Top-Copper Bottom.drl   Copper Top .. Copper Bottom
+
+TOOL     SIZE   TYPE  COUNT
+   1   0.1240   NPTH      3
+   2   0.0100    PTH    126
+   3   0.0200    PTH      5
