@@ -5,13 +5,10 @@
 #define PIN A3  //NeoPixel data line
 #define RANDOMSEED A1 //Analog input which is used for generating random seed value
 #define NumPixels 40  //Number of pixels on snowflake PCB
-#define BRIGHTNESS 25 //Global brightness value
-#define PIN_SWITCH 3
+#define BRIGHTNESS 50 //Global brightness value
+#define PIN_SWITCH 3  //Input pin on MCP23008 I/O expander for momentary pushbutton switch, which is pulled up HIGH
 
-//NEO_KHZ800  800 KHz bitstream (most NeoPixel products w/WS2812 LEDs)
-//NEO_GRB     NumNumPixels are wired for GRB bitstream (most NeoPixel products)
-Adafruit_NeoPixel strip = Adafruit_NeoPixel(NumPixels, PIN, NEO_GRB + NEO_KHZ800);
-
+//Floating point arrays for storing color value of pixels
 float redStates[NumPixels];
 float blueStates[NumPixels];
 float greenStates[NumPixels];
@@ -19,6 +16,9 @@ float greenStates[NumPixels];
 float fadeRate = 0.95;
 
 uint8_t FLASHING_MODE = 0;
+uint8_t CURRENT_PIXELS = 0;
+const long ExplosionDelay[4] = {200, 150, 100, 50};
+uint8_t PixelMap[4] = {8, 24, 32, 40};
 
 /*Generally, you should use "unsigned long" for variables that hold time
   because the value will quickly become too large for an int to store*/
@@ -26,19 +26,24 @@ unsigned long previousMillis = 0;        //Stores the last time the delayed acti
 
 Adafruit_MCP23008 mcp;
 
+/*NEO_KHZ800 800 KHz bitstream (most NeoPixel products w/WS2812 LEDs), NEO_GRB NumPixels
+  are wired for GRB bitstream (most NeoPixel products)*/
+Adafruit_NeoPixel strip = Adafruit_NeoPixel(NumPixels, PIN, NEO_GRB + NEO_KHZ800);
+
 void setup()
 {
-  mcp.begin();      // use default address 0
+  mcp.begin();      //Use default I2C bus address 0
   //Being NeoPixel communication at specified data rate of 800kHz
   strip.begin();
   strip.setBrightness(BRIGHTNESS);
+  //Initialize input pin on MCP23008 I/O expander for momentary pushbutton switch, which is pulled up HIGH
   mcp.pinMode(PIN_SWITCH, INPUT);
   mcp.pullUp(PIN_SWITCH, HIGH);  // turn on a 100K pullup internally
   /*Reads transient noise from analog input A1 and uses it to generate the random seed value so that every time the device is power cylced,
     new random values are used for the animation*/
   randomSeed(analogRead(RANDOMSEED));
   //Initialize all pixels states to no color
-  for (uint16_t i = 0; i < NumPixels; i++)
+  for (uint8_t i = 0; i < NumPixels; i++)
   {
     redStates[i] = 0;
     greenStates[i] = 0;
@@ -49,15 +54,15 @@ void setup()
 
 void loop ()
 {
+  //Retrieve the current time in milliseconds since the code began running using the C function millis()
   unsigned long currentMillis = millis();
+  //Check if the flashing mode change pushbutton has been pressed
   ChangeFlashingMode();
+  //Switch case structure for changing the current pixel animation
   switch (FLASHING_MODE)
   {
     case 0:
-      for (uint16_t n = 0; n < NumPixels; n++)
-      {
-        strip.setPixelColor(n, 25, 0, 0);
-      }
+      FireworkExplosion(currentMillis);
       break;
     case 1:
       TemperatureBasedTwinkling(currentMillis);
@@ -66,7 +71,7 @@ void loop ()
       SinglePixelTwinkling(currentMillis);
       break;
     default:
-      for (uint16_t n = 0; n < NumPixels; n++)
+      for (uint8_t n = 0; n < NumPixels; n++)
       {
         strip.setPixelColor(n, 0, 0, 0);
       }
@@ -108,7 +113,7 @@ void TemperatureBasedTwinkling(unsigned long currentMillis)
     if (random(5) == 1)
     {
       //Use random function again to choose a single pixel out of the total to set to a random white color
-      uint16_t i = random(NumPixels);
+      uint8_t i = random(NumPixels);
       if (redStates[i] < 1 && greenStates[i] < 1 && blueStates[i] < 1)
       {
         redStates[i] = random(100, 255);
@@ -116,7 +121,7 @@ void TemperatureBasedTwinkling(unsigned long currentMillis)
         blueStates[i] = 255;
       }
     }
-    for (uint16_t n = 0; n < NumPixels; n++)
+    for (uint8_t n = 0; n < NumPixels; n++)
     {
       if (redStates[n] > 1 || greenStates[n] > 1 || blueStates[n] > 1)
       {
@@ -165,7 +170,7 @@ void SinglePixelTwinkling(unsigned long currentMillis)
     if (random(5) == 1)
     {
       //Use random function again to choose a single pixel out of the total to set to a random white color
-      uint16_t i = random(NumPixels);
+      uint8_t i = random(NumPixels);
       if (redStates[i] < 1 && greenStates[i] < 1 && blueStates[i] < 1)
       {
         redStates[i] = random(100, 255);
@@ -173,7 +178,7 @@ void SinglePixelTwinkling(unsigned long currentMillis)
         blueStates[i] = 255;
       }
     }
-    for (uint16_t n = 0; n < NumPixels; n++)
+    for (uint8_t n = 0; n < NumPixels; n++)
     {
       if (redStates[n] > 1 || greenStates[n] > 1 || blueStates[n] > 1)
       {
@@ -208,5 +213,33 @@ void SinglePixelTwinkling(unsigned long currentMillis)
         strip.setPixelColor(n, 0, 0, 0);  //Set pixels that are not chosen to be lit to off
       }
     }
+  }
+}
+
+void FireworkExplosion(unsigned long currentMillis)
+{
+  uint8_t ExplosionColour[4][3] = {{25, 50, 50}, {50, 70, 70}, {100, 115, 115}, {200, 210, 210}};
+  if (currentMillis - previousMillis >= ExplosionDelay[CURRENT_PIXELS])
+  {
+    //Save the last time this loop iteration happened
+    previousMillis = currentMillis;
+    for (uint8_t n = 0; n < PixelMap[CURRENT_PIXELS]; n++)
+    {
+      strip.setPixelColor(n, ExplosionColour[CURRENT_PIXELS][0], ExplosionColour[CURRENT_PIXELS][1], ExplosionColour[CURRENT_PIXELS][2]);
+    }
+    Serial.print(CURRENT_PIXELS);
+    Serial.print(" + ");
+    Serial.println(ExplosionDelay[CURRENT_PIXELS]);
+    Serial.print('\n');
+    CURRENT_PIXELS++;
+  }
+  delay(1000);
+  if (CURRENT_PIXELS > 4)
+  {
+    for (uint8_t n = 0; n < NumPixels; n++)
+    {
+      strip.setPixelColor(n, 0, 0, 0);
+    }
+    CURRENT_PIXELS = 0;
   }
 }
