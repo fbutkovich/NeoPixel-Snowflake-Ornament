@@ -18,7 +18,11 @@ float greenStates[NumPixels];
 //Controls how slowly the pixels "die" after they are flased by the twinkling animation
 float fadeRate = 0.95;
 
-bool last_switch = true;
+uint8_t FLASHING_MODE = 0;
+
+/*Generally, you should use "unsigned long" for variables that hold time
+  because the value will quickly become too large for an int to store*/
+unsigned long previousMillis = 0;        //Stores the last time the delayed action occured
 
 Adafruit_MCP23008 mcp;
 
@@ -45,75 +49,164 @@ void setup()
 
 void loop ()
 {
-  /*Check mechanical keyswitch
-    bool curr_switch = mcp.digitalRead(PIN_SWITCH);
-    //If switch has changed states since the last loop iteration, figure out if switch is pressed or released (digital HIGH or LOW)
-    if (curr_switch != last_switch)
-    {
-    if (curr_switch)
-    {
-      TemperatureBasedTwinkling();
-    }
-    else
-    {
-
-    }
-    last_switch = curr_switch;
-    }
-    delay(10);*/
-  TemperatureBasedTwinkling();
-}
-
-void TemperatureBasedTwinkling()
-{
-  /*Sets twinkling frequency by using the random() function to generate an random integer up to maximum specified,
-    the lower the number, the more frequent the pixels will twinkle*/
-  if (random(5) == 1)
+  unsigned long currentMillis = millis();
+  ChangeFlashingMode();
+  switch (FLASHING_MODE)
   {
-    //Use random function again to choose a single pixel out of the total to set to a random white color
-    uint16_t i = random(NumPixels);
-    if (redStates[i] < 1 && greenStates[i] < 1 && blueStates[i] < 1)
-    {
-      redStates[i] = random(100, 255);
-      greenStates[i] = 255;
-      blueStates[i] = 255;
-    }
-  }
-  for (uint16_t n = 0; n < NumPixels; n++)
-  {
-    if (redStates[n] > 1 || greenStates[n] > 1 || blueStates[n] > 1)
-    {
-      strip.setPixelColor(n, redStates[n], greenStates[n], blueStates[n]);
-      if (redStates[n] > 1)
+    case 0:
+      for (uint16_t n = 0; n < NumPixels; n++)
       {
-        redStates[n] = redStates[n] * fadeRate;
+        strip.setPixelColor(n, 25, 0, 0);
       }
-      else
+      break;
+    case 1:
+      TemperatureBasedTwinkling(currentMillis);
+      break;
+    case 2:
+      SinglePixelTwinkling(currentMillis);
+      break;
+    default:
+      for (uint16_t n = 0; n < NumPixels; n++)
       {
-        redStates[n] = 0;
+        strip.setPixelColor(n, 0, 0, 0);
       }
-      if (greenStates[n] > 1)
-      {
-        greenStates[n] = greenStates[n] * fadeRate;
-      }
-      else
-      {
-        greenStates[n] = 0;
-      }
-      if (blueStates[n] > 1)
-      {
-        blueStates[n] = blueStates[n] * fadeRate;
-      }
-      else
-      {
-        blueStates[n] = 0;
-      }
-    }
-    else
-    {
-      strip.setPixelColor(n, 25, 35, 35);  //Set pixels that are not chosen to be lit to off
-    }
+      break;
   }
   strip.show();
-  delay(random(25));
+}
+
+void ChangeFlashingMode()
+{
+  if (ReadButton())
+  {
+    //Increment the int variable "FLASHING_MODE" by one every time the button is pressed
+    FLASHING_MODE++;
+    if (FLASHING_MODE > 2)
+    {
+      FLASHING_MODE = 0;
+    }
+    Serial.println(FLASHING_MODE);
+  }
+}
+
+bool ReadButton()
+{
+  //Uses debounce technique by Henry Cheung @ https://www.e-tinkers.com/
+  static uint16_t state = 0;
+  state = (state << 1) | mcp.digitalRead(3) | 0xfe00;
+  return (state == 0xff00);
+}
+
+void TemperatureBasedTwinkling(unsigned long currentMillis)
+{
+  if (currentMillis - previousMillis >= random(25, 50))
+  {
+    //Save the last time this loop iteration happened
+    previousMillis = currentMillis;
+    /*Sets twinkling frequency by using the random() function to generate an random integer up to maximum specified,
+      the lower the number, the more frequent the pixels will twinkle*/
+    if (random(5) == 1)
+    {
+      //Use random function again to choose a single pixel out of the total to set to a random white color
+      uint16_t i = random(NumPixels);
+      if (redStates[i] < 1 && greenStates[i] < 1 && blueStates[i] < 1)
+      {
+        redStates[i] = random(100, 255);
+        greenStates[i] = 255;
+        blueStates[i] = 255;
+      }
+    }
+    for (uint16_t n = 0; n < NumPixels; n++)
+    {
+      if (redStates[n] > 1 || greenStates[n] > 1 || blueStates[n] > 1)
+      {
+        strip.setPixelColor(n, redStates[n], greenStates[n], blueStates[n]);
+        if (redStates[n] > 1)
+        {
+          redStates[n] = redStates[n] * fadeRate;
+        }
+        else
+        {
+          redStates[n] = 0;
+        }
+        if (greenStates[n] > 1)
+        {
+          greenStates[n] = greenStates[n] * fadeRate;
+        }
+        else
+        {
+          greenStates[n] = 0;
+        }
+        if (blueStates[n] > 1)
+        {
+          blueStates[n] = blueStates[n] * fadeRate;
+        }
+        else
+        {
+          blueStates[n] = 0;
+        }
+      }
+      else
+      {
+        strip.setPixelColor(n, 25, 35, 35);  //Set pixels that are not chosen to be lit to off
+      }
+    }
+  }
+}
+
+void SinglePixelTwinkling(unsigned long currentMillis)
+{
+  if (currentMillis - previousMillis >= random(25))
+  {
+    //Save the last time this loop iteration happened
+    previousMillis = currentMillis;
+    /*Sets twinkling frequency by using the random() function to generate an random integer up to maximum specified,
+      the lower the number, the more frequent the pixels will twinkle*/
+    if (random(5) == 1)
+    {
+      //Use random function again to choose a single pixel out of the total to set to a random white color
+      uint16_t i = random(NumPixels);
+      if (redStates[i] < 1 && greenStates[i] < 1 && blueStates[i] < 1)
+      {
+        redStates[i] = random(100, 255);
+        greenStates[i] = 255;
+        blueStates[i] = 255;
+      }
+    }
+    for (uint16_t n = 0; n < NumPixels; n++)
+    {
+      if (redStates[n] > 1 || greenStates[n] > 1 || blueStates[n] > 1)
+      {
+        strip.setPixelColor(n, redStates[n], greenStates[n], blueStates[n]);
+        if (redStates[n] > 1)
+        {
+          redStates[n] = redStates[n] * fadeRate;
+        }
+        else
+        {
+          redStates[n] = 0;
+        }
+        if (greenStates[n] > 1)
+        {
+          greenStates[n] = greenStates[n] * fadeRate;
+        }
+        else
+        {
+          greenStates[n] = 0;
+        }
+        if (blueStates[n] > 1)
+        {
+          blueStates[n] = blueStates[n] * fadeRate;
+        }
+        else
+        {
+          blueStates[n] = 0;
+        }
+      }
+      else
+      {
+        strip.setPixelColor(n, 0, 0, 0);  //Set pixels that are not chosen to be lit to off
+      }
+    }
+  }
 }
