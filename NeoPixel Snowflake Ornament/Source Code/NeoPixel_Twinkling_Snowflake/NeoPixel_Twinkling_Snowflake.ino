@@ -18,7 +18,7 @@ float fadeRate = 0.95;
 uint8_t FLASHING_MODE = 0;
 uint8_t CURRENT_PIXELS = 0;
 const long ExplosionDelay[4] = {200, 150, 100, 50};
-uint8_t PixelMap[4] = {8, 24, 32, 40};
+uint8_t ExplosionColor[4][3] = {{0, 50, 50}, {25, 75, 75}, {65, 100, 100}, {125, 125, 125}};
 
 /*Generally, you should use "unsigned long" for variables that hold time
   because the value will quickly become too large for an int to store*/
@@ -218,23 +218,41 @@ void SinglePixelTwinkling(unsigned long currentMillis)
 
 void FireworkExplosion(unsigned long currentMillis)
 {
-  uint8_t ExplosionColour[4][3] = {{25, 50, 50}, {50, 70, 70}, {100, 115, 115}, {200, 210, 210}};
   if (currentMillis - previousMillis >= ExplosionDelay[CURRENT_PIXELS])
   {
     //Save the last time this loop iteration happened
     previousMillis = currentMillis;
-    for (uint8_t n = 0; n < PixelMap[CURRENT_PIXELS]; n++)
+    if (CURRENT_PIXELS == 1)
     {
-      strip.setPixelColor(n, ExplosionColour[CURRENT_PIXELS][0], ExplosionColour[CURRENT_PIXELS][1], ExplosionColour[CURRENT_PIXELS][2]);
+      for (uint8_t n = 0; n < 8; n++)
+      {
+        strip.setPixelColor(n, ExplosionColor[CURRENT_PIXELS - 1][0], ExplosionColor[CURRENT_PIXELS - 1][1], ExplosionColor[CURRENT_PIXELS - 1][2]);
+      }
     }
-    Serial.print(CURRENT_PIXELS);
-    Serial.print(" + ");
-    Serial.println(ExplosionDelay[CURRENT_PIXELS]);
-    Serial.print('\n');
+    else if (CURRENT_PIXELS == 2)
+    {
+      for (uint8_t n = 8; n < 24; n++)
+      {
+        strip.setPixelColor(n, ExplosionColor[CURRENT_PIXELS - 1][0], ExplosionColor[CURRENT_PIXELS - 1][1], ExplosionColor[CURRENT_PIXELS - 1][2]);
+      }
+    }
+    else if (CURRENT_PIXELS == 3)
+    {
+      for (uint8_t n = 24; n < 32; n++)
+      {
+        strip.setPixelColor(n, ExplosionColor[CURRENT_PIXELS - 1][0], ExplosionColor[CURRENT_PIXELS - 1][1], ExplosionColor[CURRENT_PIXELS - 1][2]);
+      }
+    }
+    else if (CURRENT_PIXELS == 4)
+    {
+      for (uint8_t n = 32; n < 40; n++)
+      {
+        strip.setPixelColor(n, ExplosionColor[CURRENT_PIXELS - 1][0], ExplosionColor[CURRENT_PIXELS - 1][1], ExplosionColor[CURRENT_PIXELS - 1][2]);
+      }
+    }
     CURRENT_PIXELS++;
   }
-  delay(1000);
-  if (CURRENT_PIXELS > 4)
+  else if (currentMillis - previousMillis >= 500)
   {
     for (uint8_t n = 0; n < NumPixels; n++)
     {
