@@ -57,6 +57,7 @@ void loop()
   sprintf (TemperatureData, "%i", ReadTemperature());
   rf69.send((uint8_t *)TemperatureData, strlen(TemperatureData));
   rf69.waitPacketSent();
+  Serial.println(ReadTemperature());
   delay(1000);
 }
 

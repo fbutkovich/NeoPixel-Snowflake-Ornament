@@ -33,14 +33,13 @@ uint8_t TempIndex = 0;
 const long ExplosionDelay[4] = {150, 125, 100, 75};
 uint8_t ExplosionColor[4][3] = {{0, 50, 50}, {25, 75, 75}, {50, 100, 100}, {125, 125, 125}};
 //This array stores all of the acquired temperature data samples and is used for averaging
+uint8_t RandomColors[3] = {};
 int TempArray[N_TEMP_SAMPLES] = {};
 
 /*Generally, you should use "unsigned long" for variables that hold time
   because the value will quickly become too large for an int to store*/
 unsigned long previousMillis = 0; //Stores the last time the delayed action occured
 unsigned long previousMillis2 = 0;
-unsigned long patternInterval = 50 ;  //Time between steps in the pattern
-unsigned long lastUpdate = 0 ;  //For millis() when last update occoured
 
 Adafruit_MCP23008 mcp;  //Initialization of I/O expander object
 RH_RF69 rf69(RFM69_CS, RFM69_INT);    //Initialization of radio module object over SPI communication.
@@ -107,35 +106,31 @@ void loop ()
   unsigned long currentMillis = millis();
   //Check if the flashing mode change pushbutton has been pressed
   ChangeFlashingMode();
-  if (millis() - lastUpdate > patternInterval)
+  //Switch case structure for changing the current pixel animation
+  switch (FLASHING_MODE)
   {
-    //Switch case structure for changing the current pixel animation
-    switch (FLASHING_MODE)
-    {
-      case 0:
-        TemperatureBasedTwinkling(currentMillis);
-        break;
-      case 1:
-        SinglePixelTwinkling(currentMillis);
-        break;
-      case 2:
-        FireworkExplosion(currentMillis);
-        break;
-      case 3:
-        theaterChase(strip.Color(100, 100, 100), currentMillis, 50);
-        break;
-      case 4:
-        rainbow();
-        break;
-      default:
-        for (uint8_t n = 0; n < NumPixels; n++)
-        {
-          strip.setPixelColor(n, 0, 0, 0);
-        }
-        break;
-    }
+    case 0:
+      TemperatureBasedTwinkling(currentMillis);
+      break;
+    case 1:
+      SinglePixelTwinkling(currentMillis);
+      break;
+    case 2:
+      FireworkExplosion(currentMillis);
+      break;
+    case 3:
+      theaterChase(strip.Color(RandomColors[0], RandomColors[1], RandomColors[2]), currentMillis, 50);
+      break;
+    case 4:
+      rainbow(currentMillis, 50);
+      break;
+    default:
+      for (uint8_t n = 0; n < NumPixels; n++)
+      {
+        strip.setPixelColor(n, 0, 0, 0);
+      }
+      break;
   }
-  strip.show();
 }
 
 //This is a polling type function which is called every time main loop runs
@@ -145,6 +140,10 @@ void ChangeFlashingMode()
   {
     //Increment the int variable "FLASHING_MODE" by one every time the button is pressed
     FLASHING_MODE++;
+    for (uint8_t i = 0; i < 3; i++)
+    {
+      RandomColors[i] = random(100);
+    }
     //Reset the mode counter variable
     if (FLASHING_MODE > 4)
     {
@@ -165,6 +164,7 @@ bool ReadButton()
   which color the NeoPixel LEDS are "twinkled" at*/
 void TemperatureBasedTwinkling(unsigned long currentMillis)
 {
+  int frequency = map(AverageOutdoorTemp(), -20, 20, 1, 10);
   if (currentMillis - previousMillis >= random(abs(AverageOutdoorTemp()), 50))
   {
     //Save the last time this loop iteration happened
@@ -174,7 +174,7 @@ void TemperatureBasedTwinkling(unsigned long currentMillis)
     {
       /*Sets twinkling frequency by using the random() function to generate an random integer up to maximum specified which changes with temperature,
         the lower the number (colder outside), the more frequent the pixels will twinkle*/
-      if (random(AverageOutdoorTemp()) == 1)
+      if (random(frequency) == 1)
       {
         //Use random function again to choose a single pixel out of the total to set to a random white color
         uint8_t i = random(NumPixels);
@@ -235,6 +235,7 @@ void TemperatureBasedTwinkling(unsigned long currentMillis)
     previousMillis2 = currentMillis;
     ReadTemperature();
   }
+  strip.show();
 }
 
 void SinglePixelTwinkling(unsigned long currentMillis)
@@ -292,6 +293,7 @@ void SinglePixelTwinkling(unsigned long currentMillis)
       }
     }
   }
+  strip.show();
 }
 
 void FireworkExplosion(unsigned long currentMillis)
@@ -362,6 +364,7 @@ void FireworkExplosion(unsigned long currentMillis)
     }
     CURRENT_PIXELS = 0;
   }
+  strip.show();
 }
 
 //Theatre-style crawling lights animation provided by Adafruit open-source example
@@ -380,26 +383,43 @@ void theaterChase(uint32_t c, unsigned long currentMillis, uint8_t wait)
       delay(wait);
       for (uint16_t i = 0; i < strip.numPixels(); i = i + 3)
       {
-        strip.setPixelColor(i + q, random(0, 25), 50, 50);      //Turn every third pixel off
+        strip.setPixelColor(i + q, 0, 0, 0);      //Turn every third pixel off
       }
     }
   }
 }
 
 //Rainbow animation provided by Adafruit open-source example
-void rainbow()
+void rainbow(unsigned long currentMillis, uint8_t wait)
 {
-  static uint16_t j = 0;
-  for (int i = 0; i < strip.numPixels(); i++) {
-    strip.setPixelColor(i, Wheel((i + j) & 100));
-  }
-  strip.show();
-  j++;
-  if (j >= 101)
+  static int j = 0, q = 0;
+  static boolean on = true;
+  if (on)
   {
-    j = 0;
+    for (int i = 0; i < strip.numPixels(); i = i + 3)
+    {
+      strip.setPixelColor(i + q, Wheel( (i + j) % 255)); //turn every third pixel on
+    }
   }
-  lastUpdate = millis(); // time for next change to the display
+  else
+  {
+    for (int i = 0; i < strip.numPixels(); i = i + 3)
+    {
+      strip.setPixelColor(i + q, 0);      //turn every third pixel off
+    }
+  }
+  if (currentMillis - previousMillis >= wait)
+  {
+    on = !on; // toggel pixelse on or off for next time
+  }
+  strip.show(); // display
+  q++; // update the q variable
+  if (q >= 3 )
+  { // if it overflows reset it and update the J variable
+    q = 0;
+    j++;
+    if (j >= 256) j = 0;
+  }
 }
 
 /*Input a value 0 to 255 to get a color value.
