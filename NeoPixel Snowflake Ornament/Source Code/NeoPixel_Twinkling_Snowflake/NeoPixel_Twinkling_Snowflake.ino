@@ -27,6 +27,7 @@ float fadeRate = 0.95;
 //Integer variable that gets incremented every time the flashing mode button is pressed
 uint8_t FLASHING_MODE = 0;
 uint8_t CURRENT_PIXELS = 0;
+uint8_t i = 0;
 /*Counter variable which gets incremented every time a wireless temperature data transmission is received from the
   standalone temperature controller*/
 uint8_t TempIndex = 0;
@@ -124,6 +125,12 @@ void loop ()
     case 4:
       rainbow(currentMillis, 50);
       break;
+    case 5:
+      Comet(RandomColors[0], RandomColors[1], RandomColors[2], 10, currentMillis, 50);
+      break;
+    case 6:
+      CometRainbow(10, currentMillis, 50);
+      break;
     default:
       for (uint8_t n = 0; n < NumPixels; n++)
       {
@@ -142,10 +149,10 @@ void ChangeFlashingMode()
     FLASHING_MODE++;
     for (uint8_t i = 0; i < 3; i++)
     {
-      RandomColors[i] = random(100);
+      RandomColors[i] = random(200);
     }
     //Reset the mode counter variable
-    if (FLASHING_MODE > 4)
+    if (FLASHING_MODE > 6)
     {
       FLASHING_MODE = 0;
     }
@@ -418,7 +425,10 @@ void rainbow(unsigned long currentMillis, uint8_t wait)
   { // if it overflows reset it and update the J variable
     q = 0;
     j++;
-    if (j >= 256) j = 0;
+    if (j >= 256)
+    {
+      j = 0;
+    }
   }
 }
 
@@ -438,6 +448,53 @@ uint32_t Wheel(byte WheelPos)
   }
   WheelPos -= 170;
   return strip.Color(WheelPos * 3, 255 - WheelPos * 3, 0);
+}
+
+//A "comet" effect where every pixel before the head one slowly fades to off
+void Comet(uint8_t G, uint8_t R, uint8_t B, uint8_t tailLength, unsigned long currentMillis, uint16_t wait) {
+  uint8_t r;
+  uint8_t g;
+  uint8_t b;
+  uint8_t numPixel = strip.numPixels();   // Obtain the # of NeoPixels in the pixel strip
+  if (currentMillis - previousMillis >= wait && i < numPixel + tailLength)
+  {
+    previousMillis = currentMillis;
+    /* Step through each pixel in the clockwise direction
+      until the end pixel has been reached */
+    r = R / numPixel * i; /* Divide the initial 8-bit brightness value for this specific color by the number
+    of total pixels times the current pixel, this makes each pixel brighter as it steps through the loop */
+    g = G / numPixel * i;
+    b = B / numPixel * i;
+    strip.setPixelColor(i, g, r, b);  /* Set the pixel color using the color values which change dynamically
+    as each loop interation increments */
+    strip.show();
+    strip.setPixelColor(abs(i - tailLength), 0, 0, 0);  /* Turn off every pixel after the total length of the
+    "tail" behind the lead pixel */
+    i++;
+  }
+  if (i == numPixel + tailLength)
+  {
+    i = 0;
+  }
+}
+
+//A rainbow variation of the "comet" effect where every pixel before the head one slowly fades to off
+void CometRainbow(uint8_t tailLength, unsigned long currentMillis, uint16_t wait) {
+  uint8_t numPixel = strip.numPixels();   // Obtain the # of NeoPixels in the pixel strip
+  if (currentMillis - previousMillis >= wait && i < numPixel + tailLength)
+  {
+    previousMillis = currentMillis;
+    strip.setPixelColor(i, Wheel(map(i, 0 , 39, 0, 255)));  /* Set the pixel color using the color values which change dynamically
+    as each loop interation increments */
+    strip.show();
+    strip.setPixelColor(abs(i - tailLength), 0, 0, 0);  /* Turn off every pixel after the total length of the
+    "tail" behind the lead pixel */
+    i++;
+  }
+  if (i == numPixel + tailLength)
+  {
+    i = 0;
+  }
 }
 
 /*This function is called by animations that are based on temperature and uses the RFM69 radio to retrieve
